@@ -26,9 +26,17 @@ def trust_query( url, value ):
     headers = {
         'Content-Type': 'application/json'
     }
-    data = '"{}"'.format(value)
 
     return requests.put(url, headers=headers, data=value)
+
+def get_user(value):
+    print("Put value: %s" %value)
+
+def get_score(value):
+    print("Put value: %s" %value)
+
+def get_resource(value):
+    print("Put value: %s" %value)
 
 @app.route('/<int:task_id>', methods=['GET', 'PUT'])
 def update_task(task_id):
@@ -59,6 +67,14 @@ def update_task(task_id):
         abort(400)
 
     tasks[0]['value'] = request.json.get('value', tasks[0]['value'])
+    
+    if task_id == 1:
+        get_user(tasks[0]['value'])
+    if task_id == 2:
+        get_score(tasks[0]['value'])
+    if task_id == 3:
+        get_resource(tasks[0]['value'])
+
     #time.sleep(5)
     return jsonify({'tasks': tasks[0]})
 
@@ -67,8 +83,7 @@ def not_found(error):
     return make_response(jsonify({'error': 'Not found'}), 404)
 
 if __name__ == "__main__":
-    app.run(host='192.168.1.103',port=5000)
-    app.run(debug=True)
+    app.run(host='192.168.1.103',port=5000, debug=True)
 
 #Query Command
 # curl -i -H "Content-Type: application/json" -X PUT -d "{\"JWT\":\"VALUE\"}" http://localhost:5000/1
