@@ -1,11 +1,7 @@
 from flask import Flask, jsonify, request
 import requests
-import json
 import time
 
-user = ""
-score = ""
-resource = ""
 
 app = Flask(__name__)
 #Need user, score, and resource for OPA query
@@ -32,50 +28,35 @@ def trust_query( url, value ):
     }
 
     return requests.put(url, headers=headers, data=value)
-def opa_query (url):
-    string_holder = "}}"
-    headers = {
-        'Content-Type': 'application/json'
-    }
-    null = ""
-    data = '{"input":{"user": "%s", "access": "write", "object": "%s", "score": "%s"%s}%s} ' %(user, resource, score, null, null)
-    return requests.post(url, headers=headers, data=data)
 
 def get_user(value):
-    global user 
-    user = value
+    print("Put value: %s" %value)
 
 def get_score(value):
-    global score
-    score = value
+    print("Put value: %s" %value)
 
 def get_resource(value):
-    global resource
-    resource = value
+    print("Put value: %s" %value)
 
 @app.route('/<int:task_id>', methods=['GET', 'PUT'])
 def update_task(task_id):
 
     if request.method == 'GET':
 
-        get_user(request.headers['Remote-User'])
-        get_resource(request.headers['X-Forwarded-Host'])
+        print(request.headers['Remote-User'])
+        print(request.headers['X-Forwarded-Host'])
 
         #Json format for windows commandline user = r"{\"value\":\"%s\"}" % request.headers['Remote-User']
 
         #grabs the user from traifik get request
         user1 = '{"value": "%s"}' %request.headers['Remote-User']
 
-        #Calls function trust_query to PUT user into TurstAPI
+        #Push the username to the trust API
         query1 = trust_query('http://192.168.1.103:5001/1', user1)
 
-        if str(query1) != '<Response [200]>':
-            print("query1:%s" %query1)
-            print("Unknown error. Expected value is <Response [200]>")
-            #For some reason when I return this response to traifik, It still continues as authenticated
-            abort(404)
-        #WHEN THIS FUNCTION IS CALLED. IT BREAKS.
-        #print(opa_query('localhost:8181/v1/data/rbac/authz/allow'))
+        #prints out the response from trust api. 
+        #Need to implement continue if response = 200
+        print("query1: %s" %query1)
 
         return jsonify({'tasks': tasks})
 
@@ -86,10 +67,13 @@ def update_task(task_id):
         abort(400)
 
     tasks[0]['value'] = request.json.get('value', tasks[0]['value'])
-
-    #Saves pushed values.
+    
+    if task_id == 1:
+        get_user(tasks[0]['value'])
     if task_id == 2:
         get_score(tasks[0]['value'])
+    if task_id == 3:
+        get_resource(tasks[0]['value'])
 
     #time.sleep(5)
     return jsonify({'tasks': tasks[0]})
@@ -97,7 +81,6 @@ def update_task(task_id):
 @app.errorhandler(404)
 def not_found(error):
     return make_response(jsonify({'error': 'Not found'}), 404)
-
 
 if __name__ == "__main__":
     app.run(host='192.168.1.103',port=5000, debug=True)
