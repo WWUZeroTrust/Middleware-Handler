@@ -32,14 +32,13 @@ def trust_query( url, value ):
     }
 
     return requests.put(url, headers=headers, data=value)
-def opa_query (url):
-    string_holder = "}}"
+def opa_query ():
     headers = {
         'Content-Type': 'application/json'
     }
     null = ""
     data = '{"input":{"user": "%s", "access": "write", "object": "%s", "score": "%s"%s}%s} ' %(user, resource, score, null, null)
-    return requests.post(url, headers=headers, data=data)
+    return requests.post('localhost:8181/v1/data/rbac/authz/allow', headers=headers, data=data)
 
 def get_user(value):
     global user 
@@ -74,8 +73,8 @@ def update_task(task_id):
             print("Unknown error. Expected value is <Response [200]>")
             #For some reason when I return this response to traifik, It still continues as authenticated
             abort(404)
-        #WHEN THIS FUNCTION IS CALLED. IT BREAKS.
-        #print(opa_query('localhost:8181/v1/data/rbac/authz/allow'))
+        #WHEN THIS FUNCTION IS CALLED. IT BREAKS. IT IS AN ISSUE WITH THE DATA VARIABLE IN opa_query(). Query needs to be sucessfull for traifik not to break. 
+        print(opa_query())
 
         return jsonify({'tasks': tasks})
 
