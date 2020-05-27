@@ -1,11 +1,12 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, abort
 import requests
 import json
-import time
+import threading
 
 user = ""
 score = ""
 resource = ""
+lock = threading.Event()
 
 app = Flask(__name__)
 #Need user, score, and resource for OPA query
@@ -31,7 +32,10 @@ def trust_query( url, value ):
         'Content-Type': 'application/json'
     }
 
-    return requests.put(url, headers=headers, data=value)
+    try:
+        return requests.put(url, headers=headers, data=value)
+    except:
+        return ""
 def opa_query ():
     headers = {
         'Content-Type': 'application/json'
@@ -41,7 +45,10 @@ def opa_query ():
     data = '{"input":{"user": "%s", "action": "write", "object": "%s", "score": "%s"%s}%s}' %(user, resource, score, null, null)
     print(data)
     response = requests.post(url, headers=headers, data=data)
-    return(response.text)
+    try:
+        return(response.text)
+    except:
+        return ""
 
 def get_user(value):
     global user 
@@ -55,9 +62,9 @@ def get_resource(value):
     global resource
     resource = value
 
-@app.route('/<int:task_id>', methods=['GET', 'PUT'])
-def update_task(task_id):
-
+@app.route('/<int:task_id>', methods=['GET'])
+def Query_routine(task_id):
+    global lock
     if request.method == 'GET':
 
         get_user(request.headers['Remote-User'])
@@ -74,17 +81,27 @@ def update_task(task_id):
         if str(query1) != '<Response [200]>':
             print("query1:%s" %query1)
             print("Unknown error. Expected value is <Response [200]>")
-            #For some reason when I return this response to traifik, It still continues as authenticated
-            abort(404)
-        #WHEN THIS FUNCTION IS CALLED. IT BREAKS. IT IS AN ISSUE WITH THE DATA VARIABLE IN opa_query(). Query needs to be sucessfull for traifik not to break. 
+            abort(502)
+
+        #Wait for lock to open. This waits for a new score to be pushed from TrustAPI
+        lock.wait()
+
+
         query2 = opa_query()
         if str(query2) != '{"result":true}':
             print("query2:%s" %query2)
             print("Unknown error. Either access was denied or there was a failed connection to Open Policy Agent")
-            abort(404)
+            abort(401)
+
+        #After the OPA has evaluated all fields, the lock is set to closed, and waits for a new updated score. 
+
 
         return jsonify({'tasks': tasks})
 
+lock.clear()
+
+@app.route('/<int:task_id>', methods=['PUT'])
+def update_task(task_id):
     task = [task for task in tasks if task['id'] == task_id]
     if len(task) == 0:
         abort(404)
@@ -93,17 +110,13 @@ def update_task(task_id):
 
     tasks[0]['value'] = request.json.get('value', tasks[0]['value'])
 
-    #Saves pushed values.
     if task_id == 2:
         get_score(tasks[0]['value'])
+        global lock
+        lock.set()
+        print("Lock is set to open")
 
-    #time.sleep(5)
     return jsonify({'tasks': tasks[0]})
-
-@app.errorhandler(404)
-def not_found(error):
-    return make_response(jsonify({'error': 'Not found'}), 404)
-
 
 if __name__ == "__main__":
     app.run(host='192.168.1.103',port=5000, debug=True)
