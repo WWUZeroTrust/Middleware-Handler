@@ -36,9 +36,12 @@ def opa_query ():
     headers = {
         'Content-Type': 'application/json'
     }
+    url = 'http://localhost:8181/v1/data/rbac/authz/allow'
     null = ""
-    data = '{"input":{"user": "%s", "access": "write", "object": "%s", "score": "%s"%s}%s} ' %(user, resource, score, null, null)
-    return requests.post('localhost:8181/v1/data/rbac/authz/allow', headers=headers, data=data)
+    data = '{"input":{"user": "%s", "action": "write", "object": "%s", "score": "%s"%s}%s}' %(user, resource, score, null, null)
+    print(data)
+    response = requests.post(url, headers=headers, data=data)
+    return(response.text)
 
 def get_user(value):
     global user 
@@ -74,7 +77,11 @@ def update_task(task_id):
             #For some reason when I return this response to traifik, It still continues as authenticated
             abort(404)
         #WHEN THIS FUNCTION IS CALLED. IT BREAKS. IT IS AN ISSUE WITH THE DATA VARIABLE IN opa_query(). Query needs to be sucessfull for traifik not to break. 
-        print(opa_query())
+        query2 = opa_query()
+        if str(query2) != '{"result":true}':
+            print("query2:%s" %query2)
+            print("Unknown error. Either access was denied or there was a failed connection to Open Policy Agent")
+            abort(404)
 
         return jsonify({'tasks': tasks})
 
